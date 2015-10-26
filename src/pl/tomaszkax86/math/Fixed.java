@@ -1,17 +1,17 @@
 /*
  * Copyright (c) 2015, Tomasz Kapuściński
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
- * 
+ *
  * * Redistributions of source code must retain the above copyright notice, this
  *   list of conditions and the following disclaimer.
- * 
+ *
  * * Redistributions in binary form must reproduce the above copyright notice,
  *   this list of conditions and the following disclaimer in the documentation
  *   and/or other materials provided with the distribution.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
  * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
@@ -28,7 +28,7 @@ package pl.tomaszkax86.math;
 /**
  * Class for storage, calculations, and conversion between numberic formats
  * and fixed-point Q16.16 format.
- * 
+ *
  * @author Tomasz Kapuściński
  */
 public final class Fixed extends Number
@@ -37,12 +37,16 @@ public final class Fixed extends Number
     private final int fixed;
 
 
-    // Creates new fixed-point using fixed-point bits
-    private Fixed(int fixed, boolean nul)
+    /**
+     * Creates new fixed-point value with binary representation.
+     * @param fixed binary representation of half-float
+     * @param dummy unused argument
+     */
+    private Fixed(int fixed, boolean dummy)
     {
         this.fixed = fixed;
     }
-    
+
     /**
      * Creates new fixed-point value from {@code short}
      * @param value {@code short} value
@@ -102,7 +106,7 @@ public final class Fixed extends Number
     {
         return toDouble(fixed);
     }
-    
+
     @Override
     public String toString()
     {
@@ -208,7 +212,7 @@ public final class Fixed extends Number
     {
         return Math.scalb((double) fixed, -BIT_SHIFT);
     }
-    
+
     /**
      * Returns {@code Fixed} object from fixed-point representation.
      * @param fixed fixed-point representation
@@ -281,7 +285,7 @@ public final class Fixed extends Number
         return (int) result;
     }
 
-    
+
     /**
      * The number of bytes used to represent fixed-point value.
      */
@@ -312,7 +316,7 @@ public final class Fixed extends Number
      */
     public static final int MIN_VALUE = 0b00000000_00000000_00000000_00000001;
 
-    
+
     // constant bit shift for Q16.16 format
     private static final int BIT_SHIFT = 16;
 }
