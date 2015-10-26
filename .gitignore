@@ -14,3 +14,4 @@ hs_err_pid*
 # built files
 build/
 docs/
+dist/
