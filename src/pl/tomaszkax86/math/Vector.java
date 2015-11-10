@@ -35,7 +35,8 @@ import java.util.Arrays;
  */
 public final class Vector implements Serializable
 {
-    private final float[] values;
+    // values of this vector
+    final float[] values;
 
 
     /**
