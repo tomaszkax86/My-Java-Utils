@@ -30,6 +30,7 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
+import java.util.ArrayList;
 import java.util.ServiceLoader;
 
 /**
@@ -200,5 +201,20 @@ public abstract class ModelLoader
 
         throw new IllegalArgumentException("Unknown file name extension: "
                 + extension);
+    }
+
+    public static ModelLoader[] getInstances()
+    {
+        ArrayList<ModelLoader> result = new ArrayList<>();
+
+        ServiceLoader<ModelLoader> service
+                = ServiceLoader.load(ModelLoader.class);
+
+        for (ModelLoader loader : service)
+        {
+            result.add(loader);
+        }
+
+        return result.toArray(new ModelLoader[result.size()]);
     }
 }
