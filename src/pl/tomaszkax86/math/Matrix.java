@@ -1,17 +1,17 @@
 /*
  * Copyright (c) 2015, Tomasz Kapuściński
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
- * 
+ *
  * * Redistributions of source code must retain the above copyright notice, this
  *   list of conditions and the following disclaimer.
- * 
+ *
  * * Redistributions in binary form must reproduce the above copyright notice,
  *   this list of conditions and the following disclaimer in the documentation
  *   and/or other materials provided with the distribution.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
  * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
@@ -41,9 +41,10 @@ public final class Matrix implements Serializable
     // matrix dimensions and content
     private final int rows, columns;
     private float[][] values;
-    
-    // auxiliary matrix to speed up some operations
-    private transient Matrix aux = null;
+
+    // auxiliary matrices to speed up some operations
+    private transient Matrix transformation = null;
+    private transient Matrix result = null;
 
 
     /**
@@ -107,6 +108,48 @@ public final class Matrix implements Serializable
         values[row][column] = value;
     }
 
+    public void getRow(int row, float[] values)
+    {
+        System.arraycopy(this.values[row], 0, values, 0, columns);
+    }
+
+    public void setRow(int row, float[] values)
+    {
+        System.arraycopy(values, 0, this.values[row], 0, columns);
+    }
+
+    public void getColumn(int column, float[] values)
+    {
+        for (int i = 0; i < rows; i++)
+        {
+            values[i] = this.values[i][column];
+        }
+    }
+
+    public void setColumn(int column, float[] values)
+    {
+        for (int i = 0; i < rows; i++)
+        {
+            this.values[i][column] = values[i];
+        }
+    }
+
+    public void addRow(int row, int other, float multiplier)
+    {
+        for (int i = 0; i < columns; i++)
+        {
+            values[row][i] += multiplier * values[other][i];
+        }
+    }
+
+    public void addColumn(int column, int other, float multiplier)
+    {
+        for (int i = 0; i < rows; i++)
+        {
+            values[i][column] += multiplier * values[i][other];
+        }
+    }
+
     @Override
     public Matrix clone()
     {
@@ -138,10 +181,100 @@ public final class Matrix implements Serializable
      */
     public Matrix transform(Matrix transform)
     {
-        requestAux();
+        requestResult();
 
-        multiply(this, transform, aux);
-        swap(this, aux);
+        multiply(this, transform, result);
+        swap(this, result);
+
+        return this;
+    }
+
+    /**
+     * Transforms this matrix by translation matrix.
+     * @param dx translation of X axis
+     * @param dy translation of Y axis
+     * @param dz translation of Z axis
+     * @return this matrix
+     */
+    public Matrix translate(float dx, float dy, float dz)
+    {
+        requestTransform();
+
+        loadTranslation(transformation, dx, dy, dz);
+        transform(transformation);
+
+        return this;
+    }
+
+    /**
+     * Transforms this matrix by scale matrix.
+     * @param sx scale on X axis
+     * @param sy scale on Y axis
+     * @param sz scale on Z axis
+     * @return this matrix
+     */
+    public Matrix scale(float sx, float sy, float sz)
+    {
+        requestTransform();
+
+        loadScale(transformation, sx, sy, sz);
+        transform(transformation);
+
+        return this;
+    }
+
+    /**
+     * Transforms this matrix by perspective projection matrix.
+     * @param fov field of view in degrees
+     * @param aspect aspect ratio (width / height)
+     * @param near near plane
+     * @param far far plane
+     * @return this matrix
+     */
+    public Matrix perspective(float fov, float aspect, float near, float far)
+    {
+        requestTransform();
+
+        loadPerspective(transformation, fov, aspect, near, far);
+        transform(transformation);
+
+        return this;
+    }
+
+    /**
+     * Transforms this matrix by orthographic projection matrix.
+     * @param left left plane (-X)
+     * @param right right plane (+X)
+     * @param bottom bottom plane (-Y)
+     * @param top top plane (+Y)
+     * @param near near plane (-Z)
+     * @param far far plane (+Z)
+     * @return this matrix
+     */
+    public Matrix ortho(float left, float right, float bottom, float top, float near, float far)
+    {
+        requestTransform();
+
+        loadOrtho(transformation, left, right, bottom, top, near, far);
+        transform(transformation);
+
+        return this;
+    }
+
+    /**
+     * Transforms this matrix by 2D orthographic projection matrix.
+     * @param left left plane (-X)
+     * @param right right plane (+X)
+     * @param bottom bottom plane (-Y)
+     * @param top top plane (+Y)
+     * @return this matrix
+     */
+    public Matrix ortho2D(float left, float right, float bottom, float top)
+    {
+        requestTransform();
+
+        loadOrtho2D(transformation, left, right, bottom, top);
+        transform(transformation);
 
         return this;
     }
@@ -156,10 +289,28 @@ public final class Matrix implements Serializable
     }
 
     /**
+     * Loads this matrix from {@code FloatBuffer} object.
+     * @param buffer {@code FloatBuffer} to load matrix from
+     */
+    public void load(FloatBuffer buffer)
+    {
+        load(this, buffer);
+    }
+
+    /**
      * Stores this matrix to {@code ByteBuffer} object.
      * @param buffer {@code ByteBuffer} to store matrix to
      */
     public void store(ByteBuffer buffer)
+    {
+        store(this, buffer);
+    }
+
+    /**
+     * Stores this matrix to {@code FloatBuffer} object.
+     * @param buffer {@code FloatBuffer} to store matrix to
+     */
+    public void store(FloatBuffer buffer)
     {
         store(this, buffer);
     }
@@ -253,6 +404,27 @@ public final class Matrix implements Serializable
     }
 
     /**
+     * Loads this matrix with camera view specified as look at vectors.
+     * @param eyeX eye X coordinate
+     * @param eyeY eye Y coordinate
+     * @param eyeZ eye Z coordinate
+     * @param centerX look at X coordinate
+     * @param centerY look at Y coordinate
+     * @param centerZ look at Z coordinate
+     * @param upX up X coordinate
+     * @param upY up Y coordinate
+     * @param upZ up Z coordinate
+     */
+    public void loadLookAt(float eyeX, float eyeY, float eyeZ,
+            float centerX, float centerY, float centerZ,
+            float upX, float upY, float upZ)
+    {
+        loadLookAt(this, eyeX, eyeY, eyeZ,
+                centerX, centerY, centerZ,
+                upX, upY, upZ);
+    }
+
+    /**
      * Loads this matrix with camera view transformation.
      * @param x X camera coordinate
      * @param y Y camera coordinate
@@ -268,34 +440,50 @@ public final class Matrix implements Serializable
     }
 
     /**
-     * Inverses this matrix.
+     * Inverts this matrix.
+     * @return this matrix
      */
-    public void inverse()
+    public Matrix inverse()
     {
         if (rows != columns)
             throw new IllegalStateException("Cannot invert non-square matrix");
 
-        requestAux();
+        requestResult();
 
-        inverse(this, aux);
-        swap(this, aux);
+        inverse(this, result);
+        swap(this, result);
+
+        return this;
     }
 
     /**
      * Transposes this matrix.
+     * @return this matrix
      */
-    public void transpose()
+    public Matrix transpose()
     {
-        requestAux();
+        requestResult();
 
-        transpose(this, aux);
-        swap(this, aux);
+        transpose(this, result);
+        swap(this, result);
+
+        return this;
     }
 
-    // requests auxiliary matrix
-    private void requestAux()
+    /**
+     * Requests transformation matrix.
+     */
+    private void requestTransform()
     {
-        if (aux == null) aux = new Matrix(rows, columns);
+        if (transformation == null) transformation = new Matrix(rows, columns);
+    }
+
+    /**
+     * Requests result matrix.
+     */
+    private void requestResult()
+    {
+        if (result == null) result = new Matrix(rows, columns);
     }
 
 
@@ -319,7 +507,7 @@ public final class Matrix implements Serializable
             }
         }
     }
-    
+
     /**
      * Loads matrix from {@code FloatBuffer} object.
      * @param matrix matrix to be loaded with values
@@ -363,7 +551,7 @@ public final class Matrix implements Serializable
 
         buffer.flip();
     }
-    
+
     /**
      * Stores matrix to {@code FloatBuffer} object.
      * @param matrix matrix with values to be stored
@@ -405,6 +593,13 @@ public final class Matrix implements Serializable
         }
     }
 
+    /**
+     * Loads matrix with translation values.
+     * @param matrix matrix to load values with
+     * @param dx translation on X axis
+     * @param dy translation on Y axis
+     * @param dz translation on Z axis
+     */
     public static void loadTranslation(Matrix matrix,
             float dx, float dy, float dz)
     {
@@ -490,6 +685,88 @@ public final class Matrix implements Serializable
             float bottom, float top)
     {
         loadOrtho(matrix, left, right, bottom, top, -1.0f, 1.0f);
+    }
+
+    /**
+     * Loads matrix with camera view using glLookAt parameters.
+     * @param matrix matrix to load with values
+     * @param eyeX eye X coordinate
+     * @param eyeY eye Y coordinate
+     * @param eyeZ eye Z coordinate
+     * @param centerX
+     * @param centerY
+     * @param centerZ
+     * @param upX up vector X coordinate
+     * @param upY up vector Y coordinate
+     * @param upZ up vector Z coordinate
+     */
+    public static void loadLookAt(Matrix matrix,
+            float eyeX, float eyeY, float eyeZ,
+            float centerX, float centerY, float centerZ,
+            float upX, float upY, float upZ)
+    {
+        // calculate forward vector
+        // normalized vector from Eye position to At position
+        float forwardX = centerX - eyeX;
+        float forwardY = centerY - eyeY;
+        float forwardZ = centerZ - eyeZ;
+
+        float inv = 1.0f / length(forwardX, forwardY, forwardZ);
+
+        forwardX *= inv;
+        forwardY *= inv;
+        forwardZ *= inv;
+
+        // calculate right vector
+        // normalized cross product of Up and Forward vectors
+        float sideX = (upY * forwardZ - upZ * forwardY);
+        float sideY = (upZ * forwardX - upX * forwardZ);
+        float sideZ = (upX * forwardY - upY * forwardX);
+
+        inv = 1.0f / length(sideX, sideY, sideZ);
+
+        sideX *= inv;
+        sideY *= inv;
+        sideZ *= inv;
+
+        // recalculate up vector
+        upX = (forwardY * sideZ - forwardZ * sideY);
+        upY = (forwardZ * sideX - forwardX * sideZ);
+        upZ = (forwardX * sideY - forwardY * sideZ);
+
+        // set matrix values
+        matrix.set(0, 0, sideX);
+        matrix.set(1, 0, sideY);
+        matrix.set(2, 0, sideZ);
+        matrix.set(3, 0, 0.0f);
+
+        matrix.set(0, 1, upX);
+        matrix.set(1, 1, upY);
+        matrix.set(2, 1, upZ);
+        matrix.set(3, 1, 0.0f);
+
+        matrix.set(0, 2, forwardX);
+        matrix.set(1, 2, forwardY);
+        matrix.set(2, 2, forwardZ);
+        matrix.set(3, 2, 0.0f);
+
+        matrix.set(0, 3, 0.0f);
+        matrix.set(1, 3, 0.0f);
+        matrix.set(2, 3, 0.0f);
+        matrix.set(3, 3, 1.0f);
+
+        matrix.translate(-eyeX, -eyeY, -eyeZ);
+    }
+
+    private static float dot(float x1, float y1, float z1,
+            float x2, float y2, float z2)
+    {
+        return x1 * x2 + y1 * y2 + z1 * z2;
+    }
+
+    private static float length(float dx, float dy, float dz)
+    {
+        return (float) Math.sqrt(dx * dx + dy * dy + dz * dz);
     }
 
     /**
@@ -599,7 +876,7 @@ public final class Matrix implements Serializable
             {
                 float x = first.values[row][column];
                 float y = second.values[row][column];
-                
+
                 result.values[row][column] = x + y;
             }
         }
@@ -697,7 +974,7 @@ public final class Matrix implements Serializable
     {
         if (src.rows != dest.columns)
             throw new IllegalArgumentException("Incompatible matrices");
-        
+
         if (src.columns != dest.rows)
             throw new IllegalArgumentException("Incompatible matrices");
 
